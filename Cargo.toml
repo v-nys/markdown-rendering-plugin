@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+anyhow = "1.0.86"
 base64 = "0.22.1"
 comrak = { version = "0.24.1", features = [ "syntect", "emojis" ] }
 learning-paths-tauri-react = { path = "../learning-paths-tauri-react/src-tauri/" }

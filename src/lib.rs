@@ -1,10 +1,13 @@
 extern crate learning_paths_tauri_react;
 
+use std::collections::HashSet;
 use base64::encode;
 use comrak::{markdown_to_html, ComrakOptions};
-use learning_paths_tauri_react::plugins::Plugin;
+use learning_paths_tauri_react::plugins::{Plugin, ClusterProcessingPlugin};
 use regex;
 use serde_yaml::Value;
+use learning_paths_tauri_react::plugins::Artifact;
+use anyhow;
 use std::io::Read;
 use std::time::SystemTime;
 use std::{
@@ -86,14 +89,22 @@ fn file_is_readable(file_path: &Path) -> bool {
 }
 
 impl Plugin for MarkdownRenderingPlugin {
-    fn can_process_extension_field(&self, field_name: &str) -> bool {
-        false
+    fn get_name(&self) -> &str {
+        "Markdown rendering"
     }
 
-    fn process_cluster(&self, cluster_path: &Path) {
-        println!("Start processing cluster");
+    fn get_version(&self) -> &str {
+        env!("CARGO_PKG_VERSION")
+    }
+
+}
+
+impl ClusterProcessingPlugin for MarkdownRenderingPlugin {
+
+    fn process_cluster(&self, cluster_path: &Path) -> Result<HashSet<Artifact>, anyhow::Error> {
         let md_files = find_md_files(cluster_path);
-        md_files.iter().for_each(|md_file| {
+        let empty_set = HashSet::new();
+        md_files.iter().try_fold(empty_set, |empty_set, md_file| {
             let html_counterpart = md_file.with_extension("html");
             let md_modification_date = get_modification_date(md_file);
             let html_modification_date = get_modification_date(&html_counterpart);
@@ -104,44 +115,28 @@ impl Plugin for MarkdownRenderingPlugin {
                 None | Some(Ordering::Equal) | Some(Ordering::Greater) => {
                     let file_contents = std::fs::read_to_string(md_file);
                     match file_contents {
-                        Err(_) => {}
+                        Err(e) => {
+                            Err(e.into())
+
+                        }
                         Ok(file_contents) => {
-                            println!("Markdown file should be rerendered.");
                             let html_output = markdown_to_html_with_inlined_images(&file_contents);
-                            std::fs::write(html_counterpart, &html_output);
+                            std::fs::write(html_counterpart, &html_output).map(|_| empty_set).map_err(|e| e.into())
                         }
                     }
                 }
                 Some(Ordering::Less) => {
-                    println!("HTML file is newer than Markdown file");
+                    println!("HTML file is newer than Markdown file. Not rendering.");
+                    Ok(empty_set)
                 }
             }
-        });
-        println!("Done processing cluster");
+        })
     }
 
-    fn process_extension_field(
-        &self,
-        cluster_path: &Path,
-        node_id: &str,
-        field_name: &str,
-        value: &Value,
-        remarks: &mut Vec<String>,
-    ) {
-        panic!("shouldn't actually have this method");
-    }
-
-    fn get_name(&self) -> &str {
-        "Markdown rendering"
-    }
-
-    fn get_version(&self) -> &str {
-        env!("CARGO_PKG_VERSION")
-    }
 }
 
 #[no_mangle]
-pub extern "C" fn create_plugin() -> *mut dyn Plugin {
+pub extern "C" fn create_plugin() -> *mut dyn ClusterProcessingPlugin {
     let plugin = Box::new(MarkdownRenderingPlugin);
     Box::into_raw(plugin)
 }
