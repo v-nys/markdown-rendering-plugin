@@ -6,7 +6,7 @@ use comrak::{markdown_to_html, ComrakOptions};
 use learning_paths_tauri_react::plugins::{Plugin, ClusterProcessingPlugin};
 use regex;
 use serde_yaml::Value;
-use learning_paths_tauri_react::plugins::Artifact;
+use learning_paths_tauri_react::plugins::ArtifactMapping;
 use anyhow;
 use std::io::Read;
 use std::time::SystemTime;
@@ -101,7 +101,7 @@ impl Plugin for MarkdownRenderingPlugin {
 
 impl ClusterProcessingPlugin for MarkdownRenderingPlugin {
 
-    fn process_cluster(&self, cluster_path: &Path) -> Result<HashSet<Artifact>, anyhow::Error> {
+    fn process_cluster(&self, cluster_path: &Path) -> Result<HashSet<ArtifactMapping>, anyhow::Error> {
         let md_files = find_md_files(cluster_path);
         let empty_set = HashSet::new();
         md_files.iter().try_fold(empty_set, |empty_set, md_file| {
